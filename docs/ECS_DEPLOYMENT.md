@@ -34,11 +34,15 @@
 
 ### 2.2 Docker Hub 拉取超时
 
-国内访问 Docker Hub 不稳定，需配置镜像加速，最终可用的镜像源：
+国内访问 Docker Hub 不稳定，需配置镜像加速。最终 ECS 上 `/etc/docker/daemon.json` 实际只保留了一个可用源：
 
-- `https://registry.cn-hangzhou.aliyuncs.com`
-- `https://docker.m.daocloud.io`
-- `https://docker.1ms.run`（最终主用）
+```json
+{
+  "registry-mirrors": ["https://docker.1ms.run"]
+}
+```
+
+过程中还试过 `registry.cn-hangzhou.aliyuncs.com`、`docker.m.daocloud.io`，最终以 `docker.1ms.run` 为准；镜像加速配置样例见 `patches/daemon.json.example`。
 
 ## 3. Docker 与 Docker Compose 安装
 
@@ -178,6 +182,8 @@ docker compose up -d server
 ```
 
 后续为稳定性把运行标签回退到 `guarded`；`resolved` 镜像保留在 ECS 上，重新启用时改 `.env` 的 `TAG=resolved` 即可。
+
+> 2026-08-03 核对发现：ECS 上的 `resolved` 镜像内 resolver 实际是未打补丁的原始文件，因此“重新启用 `resolved`”前必须先用 `patches/build-images.sh` 重新构建；当前生产生效的是 `guarded`（仅 guard 补丁）。
 
 ## 9. DeepSeek AI 提供商配置
 

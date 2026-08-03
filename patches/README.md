@@ -6,12 +6,13 @@
 
 | 文件 | 用途 |
 |---|---|
-| `admin-panel-guard.js` | 修复 `/admin-panel` 403 的完整编译产物（基于 v2.24.1 原文件，只改 `canActivate`） |
+| `correct-guard.js` | 修复 `/admin-panel` 403 的完整编译产物（与 ECS `/opt/twenty-crm/correct-guard.js` 字节一致，基于 v2.24.1 原文件，只改 `canActivate`） |
 | `modify_resolver.js` | 修复 AI Provider 空列表的 Node 脚本（替换 `getModelsDevProviders` 方法） |
 | `Dockerfile.guard` | 构建 `twentycrm/twenty:guarded`：叠加 guard 补丁 |
 | `Dockerfile.resolver` | 构建 `twentycrm/twenty:resolved`：在 guarded 基础上叠加 resolver 补丁 |
 | `build-images.sh` | 一键构建 `guarded` 与 `resolved` 两个镜像 |
 | `env.example` | 环境变量模板（本地/ECS 各自复制为 `.env` 后填值，不要提交真实 `.env`） |
+| `daemon.json.example` | ECS 当前使用的 Docker 镜像加速配置 |
 
 ## 一、把 ECS 上的修改拉回本地（核对用）
 
@@ -26,7 +27,7 @@ scp root@8.153.204.48:/opt/twenty-crm/Dockerfile.guard ./Dockerfile.guard
 scp root@8.153.204.48:/opt/twenty-crm/Dockerfile.resolver ./Dockerfile.resolver
 
 # 对比仓库里的版本
-diff -u /Users/peteryhzhang/Documents/AI\ Native\ CRM/twenty/patches/admin-panel-guard.js correct-guard.js
+diff -u /Users/peteryhzhang/Documents/AI\ Native\ CRM/twenty/patches/correct-guard.js correct-guard.js
 diff -u /Users/peteryhzhang/Documents/AI\ Native\ CRM/twenty/patches/modify_resolver.js modify_resolver.js
 ```
 
@@ -38,7 +39,18 @@ docker compose cp server:/app/packages/twenty-server/dist/engine/guards/admin-pa
 docker compose cp server:/app/packages/twenty-server/dist/engine/core-modules/admin-panel/admin-panel.resolver.js ./admin-panel.resolver.js
 ```
 
-## 二、在本地用同一套流程构建镜像
+## 二、2026-08-03 实际核对结果
+
+已从 ECS（`8.153.204.48`）拉取并逐字节核对：
+
+- ✅ `patches/correct-guard.js` 与 ECS `/opt/twenty-crm/correct-guard.js`、运行中的 `twentycrm/twenty:guarded` 镜像内 guard 文件完全一致。
+- ✅ `modify_resolver.js` 的替换逻辑与 ECS 版本一致；仓库版本额外支持传入文件路径并在未匹配时退出（构建脚本依赖该能力）。
+- ⚠️ ECS 宿主机 `/opt/twenty-crm/admin-panel-guard.js`（1136 字节）是早期写错 require 路径的废弃文件，**不要使用**；正确的文件是 `correct-guard.js`。
+- ⚠️ ECS 的 `twentycrm/twenty:resolved` 镜像内 resolver 文件实际是**未打补丁的原始文件**（与官方基线一致），说明当时 resolver 补丁未真正进入该镜像；当前生产运行的是 `guarded`（仅 guard 补丁）。如需启用 AI Provider 下拉框修复，需要用本目录 `build-images.sh` 重新构建 `resolved` 并部署。
+- ⚠️ ECS 的 `docker-compose.yml` 在 `server`/`worker` 下额外加了 `pull_policy: never`（避免启动时连 Docker Hub 超时）；仓库保留官方 compose，不把该 ECS 私有改写入默认配置。
+- ✅ ECS `/etc/docker/daemon.json` 当前仅含 `docker.1ms.run`，见 `daemon.json.example`。
+
+## 三、在本地用同一套流程构建镜像
 
 前提：本机 Docker 可用，已有 `twentycrm/twenty:latest`（v2.24.1 基线）。
 
@@ -52,7 +64,7 @@ chmod +x build-images.sh modify_resolver.js
 
 本地与 ECS 保持一致的方式：两边 `.env` 都用同一个 `TAG`（如 `guarded` 或 `resolved`），并从同一 Git commit 构建镜像。
 
-## 三、提交到 Git
+## 四、提交到 Git
 
 ```bash
 cd /Users/peteryhzhang/Documents/AI\ Native\ CRM/twenty
@@ -63,7 +75,7 @@ git push yunhao initial-clean:main
 
 注意：`packages/twenty-docker/.env` 与任何真实密钥都不能提交；只提交 `patches/env.example`。
 
-## 四、当前镜像标签
+## 五、当前镜像标签
 
 | 标签 | 内容 | 状态 |
 |---|---|---|

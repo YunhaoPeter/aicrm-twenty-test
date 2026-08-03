@@ -8,8 +8,8 @@
 
 | # | 修改对象 | 位置 | 状态 |
 |---|---------|------|------|
-| 1 | `admin-panel-guard.js`（编译产物） | ECS 容器内 `/app/packages/twenty-server/dist/engine/guards/admin-panel-guard.js` | ✅ 已应用（`guarded` 镜像） |
-| 2 | `admin-panel.resolver.js`（编译产物） | ECS 容器内 `/app/packages/twenty-server/dist/engine/core-modules/admin-panel/admin-panel.resolver.js` | ✅ 已应用（`resolved` 镜像） |
+| 1 | `admin-panel-guard.js`（编译产物） | ECS 容器内 `/app/packages/twenty-server/dist/engine/guards/admin-panel-guard.js` | ✅ 已应用（`guarded` 镜像）；对应补丁文件为 `patches/correct-guard.js` |
+| 2 | `admin-panel.resolver.js`（编译产物） | ECS 容器内 `/app/packages/twenty-server/dist/engine/core-modules/admin-panel/admin-panel.resolver.js` | ⚠️ 已写入 `modify_resolver.js`，但核对发现 ECS `resolved` 镜像内实际为未打补丁原文件 |
 | 3 | `Dockerfile.guard` | ECS `/opt/twenty-crm/` | ✅ 已创建 |
 | 4 | `Dockerfile.resolver` | ECS `/opt/twenty-crm/` | ✅ 已创建 |
 | 5 | `.env` | ECS `/opt/twenty-crm/.env` | ✅ 已配置（含密钥，勿入库） |
@@ -25,7 +25,7 @@
 
 问题：`/admin-panel` GraphQL 端点没有 JWT 认证中间件，`request.user` 为 null，`AdminPanelGuard` 直接拒绝，导致管理员面板所有查询返回 403 Forbidden。
 
-修改后的完整文件（即对话中 `/tmp/fixed-admin-panel-guard.js` 的内容）：
+修改后的完整文件（即对话中 `/tmp/correct-guard.js` 的内容，仓库内为 `patches/correct-guard.js`）：
 
 ```javascript
 "use strict";
@@ -70,6 +70,7 @@ docker compose cp correct-guard.js server:/app/packages/twenty-server/dist/engin
 ```
 
 注意：曾先修改了 `require("../../core-modules/...")` 的路径写法并 `docker commit` 成 `twentycrm/twenty:patched`，结果 `MODULE_NOT_FOUND` 崩溃；上面这份是从原镜像提取后只改 `canActivate` 的版本，才是可用的。
+ECS 宿主机遗留的 `/opt/twenty-crm/admin-panel-guard.js`（1136 字节）就是那个错误版本，请以 `correct-guard.js` 为准。
 
 ### 2.2 `admin-panel.resolver.js`（AI Provider 下拉框空白修复）
 
@@ -144,6 +145,12 @@ DISABLE_CRON_JOBS_REGISTRATION=true
 ```
 
 `docker-compose.yml` 仅在调试拉取超时时给 `server` / `worker` 加过 `pull_policy: never`，正式运行使用官方 compose 文件即可。
+
+## 2.5 2026-08-03 核对结论
+
+- `patches/correct-guard.js` 与 ECS 运行的 `guarded` 镜像内 guard 文件完全一致。
+- ECS 的 `resolved` 镜像内 resolver 仍是原始文件，resolver 补丁未真正生效；当前生产仅 `guarded`（guard 补丁）生效。
+- 需重新构建 `resolved` 或新标签时使用 `patches/build-images.sh`。
 
 ## 3. 本地源码改动记录
 

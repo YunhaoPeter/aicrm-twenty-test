@@ -65,7 +65,7 @@ docs/
 - 关键配置：`SERVER_URL=http://8.153.204.48:3000`，`DISABLE_DB_MIGRATIONS=true`，`DISABLE_CRON_JOBS_REGISTRATION=true`，`STORAGE_TYPE=local`。
 - 安全组开放：22、80、443、3000。
 - 运行时补丁（只在 ECS 编译产物上，未写回源码）：
-  1. `admin-panel-guard.js`：修复 `/admin-panel` 403（JWT 中间件缺失）。
+  1. `admin-panel-guard.js`：修复 `/admin-panel` 403（JWT 中间件缺失），对应补丁文件 `patches/correct-guard.js`。
   2. `admin-panel.resolver.js`：`getModelsDevProviders` 空数组时返回默认 OpenAI provider，修复 AI Provider 页面空白。
 - 访问：`http://8.153.204.48:3000`。
 
@@ -154,7 +154,7 @@ docker compose up -d
 
 1. **Git 是唯一事实源**：本地和 ECS 都只从 Git 拿代码/配置，ECS 上不再手工改文件。
 2. **同一镜像标签**：本地和 ECS 使用同一个构建产物（如 `aicrm/twenty:<git-sha>` 或 release tag），禁止一边 `latest`、一边 `guarded` 漂移。
-3. **补丁入库**：guard/resolver 补丁已整理到 `patches/`（`admin-panel-guard.js`、`modify_resolver.js`、两个 Dockerfile、`build-images.sh`），本地与 ECS 用同一套构建流程应用，避免“生产有补丁、本地没有”。使用方式见 `patches/README.md`。
+3. **补丁入库**：guard/resolver 补丁已整理到 `patches/`（`correct-guard.js`、`modify_resolver.js`、两个 Dockerfile、`build-images.sh`），本地与 ECS 用同一套构建流程应用，避免“生产有补丁、本地没有”。2026-08-03 已核对：guard 补丁与 ECS 生产一致；resolver 补丁当时未真正进入 ECS 的 `resolved` 镜像，需重新构建。使用方式见 `patches/README.md`。
 4. **配置分离**：`.env` 不入 Git，维护 `.env.example`；本地/ECS 各自填值，仅允许 `SERVER_URL`、密钥等环境差异。
 5. **迁移受控**：升级版本时手动跑迁移（`yarn database:init:prod`），不要在每次启动时自动迁移；`DISABLE_DB_MIGRATIONS=true` 作为稳定运行默认。
 6. **CI/CD 同步**：push/merge 后由 CI 构建镜像并推送镜像仓库，ECS 只执行 `pull + up`；没有镜像仓库前，先保证两边用同一 Git commit + 同一构建脚本。
@@ -207,7 +207,7 @@ docker compose exec -T db psql -U postgres -d default -c \
 
 | 问题 | 根因 | 修复位置 | 状态 |
 |---|---|---|---|
-| 管理员面板 403 | `/admin-panel` 缺 JWT 中间件，`request.user` 为 null | `admin-panel-guard.js`（编译产物） | ECS 已修复，未入 Git |
+| 管理员面板 403 | `/admin-panel` 缺 JWT 中间件，`request.user` 为 null | `admin-panel-guard.js`（编译产物） | ECS 已修复，补丁已同步到 `patches/correct-guard.js` |
 | AI Provider 页面空白 | `getModelsDevProviders` 返回空数组，Select 不渲染 | `admin-panel.resolver.js`（编译产物） | ECS 已修复，未入 Git |
 | DeepSeek 模型名报错 | 配置里带空格/大写，未填精确 API model id | 配置 `deepseek-v4-flash` / `deepseek-chat` | 已解决 |
 | AI 聊天无回复 | worker 未启动 / OOM | 启动 worker；ECS 升 4GB；`DISABLE_DB_MIGRATIONS=true` | 已解决 |
