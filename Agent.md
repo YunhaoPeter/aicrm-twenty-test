@@ -229,5 +229,6 @@ docker compose exec -T db psql -U postgres -d default -c \
 
 - `docs/ECS_DEPLOYMENT.md`：ECS 部署步骤、.env 模板、迁移、问题时间线。
 - `docs/CODE_CHANGES.md`：全部补丁内容、镜像标签、复现与回滚。
+- `docs/GIT_WORKFLOW.md`：日常开发、分支管理、生产发布的完整流程。
 - `patches/README.md`：把 ECS 修改同步到本地/Git 的操作步骤与镜像构建脚本。
 - `packages/twenty-docker/`：Compose 文件、`.env.example`、`start-twenty.sh`。
