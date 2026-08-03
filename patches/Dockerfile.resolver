@@ -1,0 +1,2 @@
+FROM twentycrm/twenty:guarded
+COPY admin-panel.resolver.js /app/packages/twenty-server/dist/engine/core-modules/admin-panel/admin-panel.resolver.js

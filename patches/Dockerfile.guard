@@ -1,0 +1,2 @@
+FROM twentycrm/twenty:latest
+COPY admin-panel-guard.js /app/packages/twenty-server/dist/engine/guards/admin-panel-guard.js
